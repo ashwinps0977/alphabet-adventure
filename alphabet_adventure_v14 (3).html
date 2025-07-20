@@ -1,0 +1,247 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alphabet Adventure (Retry on Miss)</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+    background: #87CEEB;
+    font-family: sans-serif;
+  }
+  canvas {
+    display: block;
+    background: #87CEEB;
+  }
+  .overlay-btn {
+    position: absolute;
+    background: #333;
+    color: white;
+    border: none;
+    font-size: 1.5em;
+    padding: 10px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  #retryBtn, #nextBtn {
+    display: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<button id="retryBtn" class="overlay-btn" style="top: 50%; left: 40%;">🔁 Retry</button>
+<button id="nextBtn" class="overlay-btn" style="top: 50%; left: 40%;">⏭️ Next Level</button>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const retryBtn = document.getElementById("retryBtn");
+const nextBtn = document.getElementById("nextBtn");
+
+let width = window.innerWidth;
+let height = window.innerHeight;
+canvas.width = width;
+canvas.height = height;
+
+window.addEventListener('resize', () => {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+  roadY = height / 2 + height * 0.1;
+  initLevel();
+});
+
+let basketImg = new Image();
+basketImg.src = "https://i.imgur.com/eJ3J0vG.png"; // basket sprite
+
+let roadY = height / 2 + height * 0.1;
+let basket = { x: width / 2 - 25, y: roadY - 50, width: 60, height: 50 };
+
+let levelWords = ["CAT", "FISH", "CHAIR"];
+let currentLevel = 0;
+let wordToSpell = levelWords[currentLevel];
+let currentLetterIndex = 0;
+
+let letters = [];
+let message = "";
+let gameOver = false;
+let letterFallSpeed = height * 0.002;
+
+function initLevel() {
+  letters = [];
+  currentLetterIndex = 0;
+  message = "";
+  basket.width = width * 0.07;
+  basket.height = basket.width * 0.8;
+  basket.x = width / 2 - basket.width / 2;
+  basket.y = roadY - basket.height;
+  gameOver = false;
+  retryBtn.style.display = "none";
+  nextBtn.style.display = "none";
+  let spacing = height * 0.4;
+  for (let i = 0; i < wordToSpell.length; i++) {
+    let side = i % 2 === 0 ? 1 : -1;
+    letters.push({
+      letter: wordToSpell[i],
+      x: width / 2 + side * width * 0.2,
+      y: -i * spacing,
+      collected: false
+    });
+  }
+}
+
+function drawBackground() {
+  let skyGradient = ctx.createLinearGradient(0, 0, 0, height);
+  skyGradient.addColorStop(0, "#87CEEB");
+  skyGradient.addColorStop(1, "#7ec850");
+  ctx.fillStyle = skyGradient;
+  ctx.fillRect(0, 0, width, height);
+}
+
+function drawRoad() {
+  ctx.fillStyle = "#4B3621";
+  ctx.fillRect(0, roadY, width, height * 0.1);
+  ctx.strokeStyle = "#FFD700";
+  ctx.lineWidth = height * 0.01;
+  for (let i = 0; i < width; i += width * 0.05) {
+    ctx.beginPath();
+    ctx.moveTo(i, roadY + height * 0.05);
+    ctx.lineTo(i + width * 0.025, roadY + height * 0.05);
+    ctx.stroke();
+  }
+}
+
+function drawBasket() {
+  ctx.drawImage(basketImg, basket.x, basket.y, basket.width, basket.height);
+}
+
+function drawLetters() {
+  ctx.font = `${height * 0.08}px Arial`;
+  letters.forEach(l => {
+    if (!l.collected) {
+      ctx.fillStyle = "#fff";
+      ctx.fillText(l.letter, l.x, l.y);
+    }
+  });
+}
+
+function drawMessage() {
+  ctx.fillStyle = "black";
+  ctx.font = `${height * 0.05}px Arial`;
+  ctx.fillText(message, 10, height * 0.1);
+}
+
+function drawControls() {
+  ctx.fillStyle = "#333";
+  ctx.fillRect(width * 0.1, height - height * 0.12, width * 0.1, height * 0.08);
+  ctx.fillRect(width * 0.8, height - height * 0.12, width * 0.1, height * 0.08);
+  ctx.fillStyle = "#fff";
+  ctx.font = `${height * 0.05}px Arial`;
+  ctx.fillText("⬅️", width * 0.125, height - height * 0.06);
+  ctx.fillText("➡️", width * 0.825, height - height * 0.06);
+}
+
+function updateGame() {
+  if (gameOver) return;
+
+  ctx.clearRect(0, 0, width, height);
+  drawBackground();
+  drawRoad();
+  drawBasket();
+  drawLetters();
+  drawMessage();
+  drawControls();
+
+  letters.forEach(l => {
+    l.y += letterFallSpeed;
+    if (!l.collected && l.y + height * 0.05 >= basket.y && l.y <= basket.y + basket.height) {
+      if ((l.x < width / 2 && basket.x < width / 2) ||
+          (l.x > width / 2 && basket.x > width / 2)) {
+        if (l.letter === wordToSpell[currentLetterIndex]) {
+          l.collected = true;
+          currentLetterIndex++;
+          message = "✅ Correct!";
+          if (currentLetterIndex === wordToSpell.length) {
+            message = "🎉 You spelled " + wordToSpell + "!";
+            gameOver = true;
+            setTimeout(() => {
+              if (currentLevel + 1 >= levelWords.length) {
+                message = "🏆 Game Completed!";
+              } else {
+                nextBtn.style.display = "block";
+              }
+            }, 1000);
+          }
+        } else {
+          message = "❌ Wrong letter!";
+          gameOver = true;
+          setTimeout(() => {
+            retryBtn.style.display = "block";
+          }, 1000);
+        }
+      }
+    } else if (!l.collected && l.y > basket.y + basket.height) {
+      message = "❌ You missed a letter!";
+      gameOver = true;
+      setTimeout(() => {
+        retryBtn.style.display = "block";
+      }, 1000);
+    }
+  });
+
+  requestAnimationFrame(updateGame);
+}
+
+function moveLeft() {
+  basket.x -= width * 0.1;
+  if (basket.x < 0) basket.x = 0;
+}
+
+function moveRight() {
+  basket.x += width * 0.1;
+  if (basket.x + basket.width > width) basket.x = width - basket.width;
+}
+
+canvas.addEventListener("click", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  if (y >= height - height * 0.12 && y <= height - height * 0.04) {
+    if (x >= width * 0.1 && x <= width * 0.2) moveLeft();
+    if (x >= width * 0.8 && x <= width * 0.9) moveRight();
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowLeft") moveLeft();
+  if (e.key === "ArrowRight") moveRight();
+});
+
+retryBtn.addEventListener("click", () => {
+  initLevel();
+  updateGame();
+});
+
+nextBtn.addEventListener("click", () => {
+  currentLevel++;
+  wordToSpell = levelWords[currentLevel];
+  initLevel();
+  updateGame();
+});
+
+basketImg.onload = function() {
+  initLevel();
+  updateGame();
+};
+</script>
+</body>
+</html>
